@@ -910,4 +910,33 @@ mod tests {
             "Legitimate client should not be locked out by attacker"
         );
     }
+
+    // ── add_session_token ─────────────────────────────────────────────
+
+    #[test]
+    async fn session_token_accepted_after_add() {
+        let guard = PairingGuard::new(true, &[]);
+        guard.add_session_token("zc_pam_test_token");
+        assert!(
+            guard.is_authenticated("zc_pam_test_token"),
+            "token added via add_session_token must be accepted by is_authenticated"
+        );
+        assert!(
+            !guard.is_authenticated("zc_pam_other_token"),
+            "unrelated token must not be accepted"
+        );
+    }
+
+    #[test]
+    async fn session_token_metadata_records_pam_source() {
+        let guard = PairingGuard::new(true, &[]);
+        guard.add_session_token("zc_pam_meta_token");
+        let devices = guard.paired_devices();
+        assert_eq!(devices.len(), 1);
+        assert_eq!(
+            devices[0].paired_by.as_deref(),
+            Some("pam"),
+            "device metadata must record 'pam' as the pairing source"
+        );
+    }
 }

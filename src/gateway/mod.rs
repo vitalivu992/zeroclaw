@@ -5780,4 +5780,173 @@ Reminder set successfully."#;
         // Should be allowed again
         assert!(limiter.allow("burst-ip"));
     }
+
+    // ── PAM login handler tests ───────────────────────────────────────
+
+    #[tokio::test]
+    async fn pam_login_returns_404_when_disabled() {
+        let state = AppState {
+            config: Arc::new(Mutex::new(Config::default())),
+            provider: Arc::new(MockProvider::default()),
+            model: "test-model".into(),
+            temperature: 0.0,
+            mem: Arc::new(MockMemory),
+            auto_save: false,
+            webhook_secret_hash: None,
+            pairing: Arc::new(PairingGuard::new(false, &[])),
+            trust_forwarded_headers: false,
+            rate_limiter: Arc::new(GatewayRateLimiter::new(100, 100, 100)),
+            idempotency_store: Arc::new(IdempotencyStore::new(Duration::from_secs(300), 1000)),
+            whatsapp: None,
+            whatsapp_app_secret: None,
+            linq: None,
+            linq_signing_secret: None,
+            bluebubbles: None,
+            bluebubbles_webhook_secret: None,
+            nextcloud_talk: None,
+            nextcloud_talk_webhook_secret: None,
+            wati: None,
+            wati_webhook_secret: None,
+            qq: None,
+            qq_webhook_enabled: false,
+            observer: Arc::new(crate::observability::NoopObserver),
+            tools_registry: Arc::new(Vec::new()),
+            tools_registry_exec: Arc::new(Vec::new()),
+            multimodal: crate::config::MultimodalConfig::default(),
+            max_tool_iterations: 10,
+            cost_tracker: None,
+            event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
+        };
+
+        let response = api::handle_pam_login(
+            State(state),
+            test_connect_info(),
+            HeaderMap::new(),
+            Some(axum::Json(api::PamLoginBody {
+                username: "zeroclaw_user".into(),
+                password: "zeroclaw_pass".into(),
+            })),
+        )
+        .await
+        .into_response();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(json["error"].as_str().is_some());
+    }
+
+    #[tokio::test]
+    async fn pam_login_returns_401_on_bad_credentials() {
+        let state = AppState {
+            config: Arc::new(Mutex::new(Config::default())),
+            provider: Arc::new(MockProvider::default()),
+            model: "test-model".into(),
+            temperature: 0.0,
+            mem: Arc::new(MockMemory),
+            auto_save: false,
+            webhook_secret_hash: None,
+            pairing: Arc::new(PairingGuard::new(false, &[])),
+            trust_forwarded_headers: false,
+            rate_limiter: Arc::new(GatewayRateLimiter::new(100, 100, 100)),
+            idempotency_store: Arc::new(IdempotencyStore::new(Duration::from_secs(300), 1000)),
+            whatsapp: None,
+            whatsapp_app_secret: None,
+            linq: None,
+            linq_signing_secret: None,
+            bluebubbles: None,
+            bluebubbles_webhook_secret: None,
+            nextcloud_talk: None,
+            nextcloud_talk_webhook_secret: None,
+            wati: None,
+            wati_webhook_secret: None,
+            qq: None,
+            qq_webhook_enabled: false,
+            observer: Arc::new(crate::observability::NoopObserver),
+            tools_registry: Arc::new(Vec::new()),
+            tools_registry_exec: Arc::new(Vec::new()),
+            multimodal: crate::config::MultimodalConfig::default(),
+            max_tool_iterations: 10,
+            cost_tracker: None,
+            event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: true,
+            pam_service: "login".into(),
+        };
+
+        // Credentials for a non-existent user always fail PAM authentication,
+        // whether the auth-pam feature is compiled in (real PAM rejects unknown user)
+        // or not (stub always returns Err).
+        let response = api::handle_pam_login(
+            State(state),
+            test_connect_info(),
+            HeaderMap::new(),
+            Some(axum::Json(api::PamLoginBody {
+                username: "zeroclaw_nonexistent_user".into(),
+                password: "zeroclaw_wrong_pass".into(),
+            })),
+        )
+        .await
+        .into_response();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(json["error"].as_str().is_some());
+    }
+
+    #[tokio::test]
+    async fn health_endpoint_reports_pam_status() {
+        let state = AppState {
+            config: Arc::new(Mutex::new(Config::default())),
+            provider: Arc::new(MockProvider::default()),
+            model: "test-model".into(),
+            temperature: 0.0,
+            mem: Arc::new(MockMemory),
+            auto_save: false,
+            webhook_secret_hash: None,
+            pairing: Arc::new(PairingGuard::new(false, &[])),
+            trust_forwarded_headers: false,
+            rate_limiter: Arc::new(GatewayRateLimiter::new(100, 100, 100)),
+            idempotency_store: Arc::new(IdempotencyStore::new(Duration::from_secs(300), 1000)),
+            whatsapp: None,
+            whatsapp_app_secret: None,
+            linq: None,
+            linq_signing_secret: None,
+            bluebubbles: None,
+            bluebubbles_webhook_secret: None,
+            nextcloud_talk: None,
+            nextcloud_talk_webhook_secret: None,
+            wati: None,
+            wati_webhook_secret: None,
+            qq: None,
+            qq_webhook_enabled: false,
+            observer: Arc::new(crate::observability::NoopObserver),
+            tools_registry: Arc::new(Vec::new()),
+            tools_registry_exec: Arc::new(Vec::new()),
+            multimodal: crate::config::MultimodalConfig::default(),
+            max_tool_iterations: 10,
+            cost_tracker: None,
+            event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: true,
+            pam_service: "login".into(),
+        };
+
+        let response = handle_health(State(state)).await.into_response();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(
+            json.get("pam_available").is_some(),
+            "health must include pam_available"
+        );
+        assert!(
+            json.get("pam_enabled").is_some(),
+            "health must include pam_enabled"
+        );
+        assert_eq!(json["pam_enabled"], true);
+        assert!(json["pam_available"].is_boolean());
+    }
 }
