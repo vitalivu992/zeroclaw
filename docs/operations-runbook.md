@@ -131,6 +131,42 @@ Before applying config changes:
 4. restart daemon/service
 5. verify with `status` + `channel doctor`
 
+## PAM Authentication (Gateway Portal)
+
+Requires: Linux host, `libpam` installed, binary built with `--features auth-pam`.
+
+**Prerequisites:**
+
+```bash
+# Debian/Ubuntu
+sudo apt-get install libpam0g-dev
+
+# Fedora/RHEL
+sudo dnf install pam-devel
+
+# Build with PAM support
+cargo build --release --features auth-pam
+```
+
+**Enable in config:**
+
+```toml
+[gateway]
+pam_auth = true
+pam_service = "login"  # maps to /etc/pam.d/login; default works on most distros
+```
+
+**Verify:**
+
+```bash
+# Check that pam_available=true and pam_enabled=true in health response
+curl -s http://localhost:3000/health | jq '{pam_available, pam_enabled}'
+```
+
+**Disable:** Set `pam_auth = false` (or remove the key) and restart.
+
+See [security/pam-auth.md](security/pam-auth.md) for full details, security properties, and token lifecycle.
+
 ## Rollback Procedure
 
 If a rollout regresses behavior:

@@ -2,7 +2,7 @@
 
 This document defines the localization structure for ZeroClaw docs and tracks current coverage.
 
-Last refreshed: **February 24, 2026**.
+Last refreshed: **March 4, 2026**.
 
 Execution guide: [i18n-guide.md](i18n-guide.md)
 Gap backlog: [i18n-gap-backlog.md](i18n-gap-backlog.md)
@@ -109,6 +109,14 @@ This closes collection-index localization parity for supported locales.
    - language entry section in `docs/SUMMARY.md`, `docs/i18n/*/SUMMARY.md`, and docs-root `docs/SUMMARY.<locale>.md` shims if present
 4. Optionally add docs-root shim files for backward compatibility.
 5. Update this file (`docs/i18n-coverage.md`) and run link validation.
+
+## Known Untranslated Content (Deferred)
+
+| Scope | English source | Deferred locales | Follow-up |
+|---|---|---|---|
+| PAM authentication docs | `docs/security/pam-auth.md`, `[gateway] pam_auth/pam_service` entries in `docs/config-reference.md`, PAM section in `docs/operations-runbook.md` | `zh-CN`, `ja`, `ru`, `fr`, `vi`, `el` | Tracked; follow-up PR after content stabilizes |
+
+Deferral policy: per CLAUDE.md §4.2, deferred i18n must be explicitly recorded here with a follow-up intent. Locale security/config index files (e.g. `docs/i18n/<locale>/security/README.md`) are not yet updated with PAM auth links.
 
 ## Review Checklist
 
