@@ -373,6 +373,10 @@ pub struct AppState {
     pub cost_tracker: Option<Arc<CostTracker>>,
     /// SSE broadcast channel for real-time events
     pub event_tx: tokio::sync::broadcast::Sender<serde_json::Value>,
+    /// Whether PAM auth is enabled for the portal (`[gateway] pam_auth = true`)
+    pub pam_enabled: bool,
+    /// PAM service name to authenticate against (e.g. `"login"`)
+    pub pam_service: String,
 }
 
 /// Run the HTTP gateway using axum with proper HTTP/1.1 compliance.
@@ -797,6 +801,8 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
         max_tool_iterations,
         cost_tracker,
         event_tx,
+        pam_enabled: config.gateway.pam_auth,
+        pam_service: config.gateway.pam_service.clone(),
     };
 
     // Config PUT needs larger body limit (1MB)
@@ -843,6 +849,7 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
         .route("/v1/models", get(openai_compat::handle_v1_models))
         .merge(openai_compat_routes)
         // ── Web Dashboard API routes ──
+        .route("/api/auth/login", post(api::handle_pam_login))
         .route("/api/status", get(api::handle_api_status))
         .route("/api/config", get(api::handle_api_config_get))
         .route("/api/tools", get(api::handle_api_tools))
@@ -909,6 +916,8 @@ async fn handle_health(State(state): State<AppState>) -> impl IntoResponse {
         "status": "ok",
         "paired": state.pairing.is_paired(),
         "require_pairing": state.pairing.require_pairing(),
+        "pam_available": crate::security::pam::is_pam_available(),
+        "pam_enabled": state.pam_enabled,
         "runtime": crate::health::snapshot_json(),
     });
     Json(body)
@@ -2993,6 +3002,8 @@ mod tests {
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let response = handle_metrics(State(state), test_connect_info(), HeaderMap::new())
@@ -3055,6 +3066,8 @@ mod tests {
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let response = handle_metrics(State(state), test_connect_info(), HeaderMap::new())
@@ -3100,6 +3113,8 @@ mod tests {
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let response = handle_metrics(State(state), test_public_connect_info(), HeaderMap::new())
@@ -3146,6 +3161,8 @@ mod tests {
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let unauthorized =
@@ -3661,6 +3678,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let mut headers = HeaderMap::new();
@@ -3735,6 +3754,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let response = handle_webhook(
@@ -3790,6 +3811,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let response = handle_webhook(
@@ -3846,6 +3869,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let response = handle_webhook(
@@ -3911,6 +3936,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let response = handle_node_control(
@@ -3969,6 +3996,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let response = handle_node_control(
@@ -4033,6 +4062,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let response = handle_node_control(
@@ -4091,6 +4122,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let headers = HeaderMap::new();
@@ -4179,6 +4212,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let response = handle_webhook(
@@ -4237,6 +4272,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let mut headers = HeaderMap::new();
@@ -4300,6 +4337,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let mut headers = HeaderMap::new();
@@ -4407,6 +4446,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let response = handle_wati_webhook(State(state), HeaderMap::new(), Bytes::from("{}"))
@@ -4459,6 +4500,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let response = handle_wati_webhook(State(state), HeaderMap::new(), Bytes::from("{}"))
@@ -4513,6 +4556,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let response = handle_wati_webhook(State(state), HeaderMap::new(), Bytes::from("{}"))
@@ -4568,6 +4613,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let mut headers = HeaderMap::new();
@@ -4630,6 +4677,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let mut headers = HeaderMap::new();
@@ -4690,6 +4739,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let mut headers = HeaderMap::new();
@@ -4751,6 +4802,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let mut headers = HeaderMap::new();
@@ -4812,6 +4865,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let mut headers = HeaderMap::new();
@@ -4875,6 +4930,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let mut headers = HeaderMap::new();
@@ -4930,6 +4987,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let response = handle_github_webhook(
@@ -4986,6 +5045,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let body = r#"{
@@ -5053,6 +5114,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let body = r#"{
@@ -5125,6 +5188,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let response = handle_nextcloud_talk_webhook(
@@ -5187,6 +5252,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let mut headers = HeaderMap::new();
@@ -5242,6 +5309,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let response = handle_qq_webhook(
@@ -5296,6 +5365,8 @@ Reminder set successfully."#;
             max_tool_iterations: 10,
             cost_tracker: None,
             event_tx: tokio::sync::broadcast::channel(16).0,
+            pam_enabled: false,
+            pam_service: "login".into(),
         };
 
         let mut headers = HeaderMap::new();

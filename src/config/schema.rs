@@ -1764,6 +1764,21 @@ pub struct GatewayConfig {
     /// Node-control protocol scaffold (`[gateway.node_control]`).
     #[serde(default)]
     pub node_control: NodeControlConfig,
+
+    /// Enable Linux PAM authentication for the gateway web portal (default: false).
+    ///
+    /// When `true`, the portal shows a username/password login form and validates
+    /// credentials against the host PAM stack. Requires the `auth-pam` Cargo feature
+    /// and libpam installed on the host.
+    #[serde(default)]
+    pub pam_auth: bool,
+
+    /// PAM service name to use for authentication (default: `"login"`).
+    ///
+    /// Maps to `/etc/pam.d/<pam_service>`. The `"login"` service works on most
+    /// Linux distributions without additional configuration.
+    #[serde(default = "default_pam_service")]
+    pub pam_service: String,
 }
 
 /// Node-control scaffold settings under `[gateway.node_control]`.
@@ -1812,6 +1827,10 @@ fn default_gateway_idempotency_max_keys() -> usize {
     10_000
 }
 
+fn default_pam_service() -> String {
+    "login".into()
+}
+
 fn default_true() -> bool {
     true
 }
@@ -1831,6 +1850,8 @@ impl Default for GatewayConfig {
             idempotency_ttl_secs: default_idempotency_ttl_secs(),
             idempotency_max_keys: default_gateway_idempotency_max_keys(),
             node_control: NodeControlConfig::default(),
+            pam_auth: false,
+            pam_service: default_pam_service(),
         }
     }
 }
@@ -11647,6 +11668,8 @@ allowed_sender_ids = ["U111", "U222"]
                 auth_token: Some("node-token".into()),
                 allowed_node_ids: vec!["node-1".into(), "node-2".into()],
             },
+            pam_auth: false,
+            pam_service: "login".into(),
         };
         let toml_str = toml::to_string(&g).unwrap();
         let parsed: GatewayConfig = toml::from_str(&toml_str).unwrap();

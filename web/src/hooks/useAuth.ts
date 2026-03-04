@@ -14,7 +14,7 @@ import {
   isAuthenticated as checkAuth,
   TOKEN_STORAGE_KEY,
 } from '../lib/auth';
-import { pair as apiPair, getPublicHealth } from '../lib/api';
+import { pair as apiPair, pamLogin as apiPamLogin, getPublicHealth } from '../lib/api';
 
 // ---------------------------------------------------------------------------
 // Context shape
@@ -29,6 +29,12 @@ export interface AuthState {
   loading: boolean;
   /** Pair with the agent using a pairing code. Stores the token on success. */
   pair: (code: string) => Promise<void>;
+  /** Authenticate with Linux PAM credentials. Stores the token on success. */
+  pamLogin: (username: string, password: string) => Promise<void>;
+  /** Whether the server has PAM auth enabled (from /health). */
+  pamEnabled: boolean;
+  /** Whether libpam is available on the server (from /health). */
+  pamAvailable: boolean;
   /** Clear the stored token and sign out. */
   logout: () => void;
 }
@@ -47,8 +53,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [token, setTokenState] = useState<string | null>(readToken);
   const [authenticated, setAuthenticated] = useState<boolean>(checkAuth);
   const [loading, setLoading] = useState<boolean>(!checkAuth());
+  const [pamEnabled, setPamEnabled] = useState<boolean>(false);
+  const [pamAvailable, setPamAvailable] = useState<boolean>(false);
 
-  // On mount: check if server requires pairing at all
+  // On mount: check if server requires pairing at all, and PAM status
   useEffect(() => {
     if (checkAuth()) return; // already have a token, no need to check
     let cancelled = false;
@@ -58,6 +66,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (!health.require_pairing) {
           setAuthenticated(true);
         }
+        setPamEnabled(health.pam_enabled ?? false);
+        setPamAvailable(health.pam_available ?? false);
       })
       .catch(() => {
         // health endpoint unreachable — fall back to showing pairing dialog
@@ -90,6 +100,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setAuthenticated(true);
   }, []);
 
+  const pamLogin = useCallback(async (username: string, password: string): Promise<void> => {
+    const { token: newToken } = await apiPamLogin(username, password);
+    writeToken(newToken);
+    setTokenState(newToken);
+    setAuthenticated(true);
+  }, []);
+
   const logout = useCallback((): void => {
     removeToken();
     setTokenState(null);
@@ -101,6 +118,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isAuthenticated: authenticated,
     loading,
     pair,
+    pamLogin,
+    pamEnabled,
+    pamAvailable,
     logout,
   };
 

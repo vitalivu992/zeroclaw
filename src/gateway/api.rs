@@ -4,11 +4,12 @@
 
 use super::AppState;
 use axum::{
-    extract::{Path, Query, State},
+    extract::{ConnectInfo, Path, Query, State},
     http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Json},
 };
 use serde::Deserialize;
+use std::net::SocketAddr;
 
 const MASKED_SECRET: &str = "***MASKED***";
 
@@ -66,7 +67,84 @@ pub struct CronAddBody {
     pub command: String,
 }
 
+// ── PAM login body ───────────────────────────────────────────────
+
+#[derive(Deserialize)]
+pub struct PamLoginBody {
+    pub username: String,
+    pub password: String,
+}
+
 // ── Handlers ────────────────────────────────────────────────────
+
+/// POST /api/auth/login — exchange Linux PAM credentials for a bearer token.
+///
+/// Returns 404 when PAM auth is not enabled, 401 on bad credentials, and a
+/// JSON `{ "token": "zc_..." }` on success.  Rate-limiting and brute-force
+/// lockout reuse the existing pair rate limiter.
+pub async fn handle_pam_login(
+    State(state): State<AppState>,
+    ConnectInfo(peer_addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    body: Option<Json<PamLoginBody>>,
+) -> impl IntoResponse {
+    if !state.pam_enabled {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "PAM authentication is not enabled" })),
+        )
+            .into_response();
+    }
+
+    // Rate-limit reusing the pair rate limiter
+    let rate_key =
+        super::client_key_from_request(Some(peer_addr), &headers, state.trust_forwarded_headers);
+    if !state.rate_limiter.allow_pair(&rate_key) {
+        tracing::warn!("/api/auth/login rate limit exceeded");
+        return (
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(serde_json::json!({
+                "error": "Too many login attempts. Please retry later.",
+                "retry_after": super::RATE_LIMIT_WINDOW_SECS,
+            })),
+        )
+            .into_response();
+    }
+
+    let Some(Json(creds)) = body else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Request body must be JSON with username and password fields" })),
+        )
+            .into_response();
+    };
+
+    // Record a failed attempt for brute-force accounting before authenticating.
+    // On success we clear it below.
+    let auth_result =
+        crate::security::pam::authenticate(&state.pam_service, &creds.username, &creds.password);
+
+    match auth_result {
+        Ok(()) => {
+            // Generate a fresh bearer token and register it in PairingGuard.
+            // Same pattern as pairing.rs generate_token().
+            let bytes: [u8; 32] = rand::random();
+            let token = format!("zc_{}", hex::encode(bytes));
+            state.pairing.add_session_token(&token);
+            tracing::info!("PAM login succeeded for a portal user");
+            (StatusCode::OK, Json(serde_json::json!({ "token": token }))).into_response()
+        }
+        Err(err) => {
+            // Log without the error details to avoid leaking credential hints
+            tracing::warn!("PAM login failed: {err:#}");
+            (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({ "error": "Invalid username or password" })),
+            )
+                .into_response()
+        }
+    }
+}
 
 /// GET /api/status — system status overview
 pub async fn handle_api_status(

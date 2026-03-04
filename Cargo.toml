@@ -205,10 +205,11 @@ wa-rs-proto = { version = "0.2", optional = true, default-features = false }
 wa-rs-ureq-http = { version = "0.2", optional = true }
 wa-rs-tokio-transport = { version = "0.2", optional = true, default-features = false }
 
-# Raspberry Pi GPIO / Landlock (Linux only) — target-specific to avoid compile failure on macOS
+# Raspberry Pi GPIO / Landlock / PAM (Linux only) — target-specific to avoid compile failure on macOS
 [target.'cfg(target_os = "linux")'.dependencies]
 rppal = { version = "0.22", optional = true }
 landlock = { version = "0.4", optional = true }
+pam-client = { version = "0.5", optional = true }
 
 # Unix-specific dependencies (for root check, etc.)
 [target.'cfg(unix)'.dependencies]
@@ -223,6 +224,8 @@ channel-lark = ["dep:prost"]
 memory-postgres = ["dep:postgres", "dep:tokio-postgres-rustls"]
 observability-otel = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp"]
 peripheral-rpi = ["rppal"]
+# auth-pam = Linux PAM authentication for the gateway web portal (Linux only)
+auth-pam = ["dep:pam-client"]
 # Browser backend feature alias used by cfg(feature = "browser-native")
 browser-native = ["dep:fantoccini"]
 # Backward-compatible alias for older invocations

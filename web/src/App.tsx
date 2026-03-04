@@ -80,8 +80,69 @@ function PairingDialog({ onPair }: { onPair: (code: string) => Promise<void> }) 
   );
 }
 
+// PAM login dialog component — shown when pam_enabled=true instead of PairingDialog
+function PamLoginDialog({ onLogin }: { onLogin: (username: string, password: string) => Promise<void> }) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      await onLogin(username, password);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="bg-gray-900 rounded-xl p-8 w-full max-w-md border border-gray-800">
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-white mb-2">ZeroClaw</h1>
+          <p className="text-gray-400">Sign in with your Linux system credentials</p>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Username"
+            autoComplete="username"
+            className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500 mb-3"
+            autoFocus
+          />
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            autoComplete="current-password"
+            className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500 mb-4"
+          />
+          {error && (
+            <p className="text-red-400 text-sm mb-4 text-center">{error}</p>
+          )}
+          <button
+            type="submit"
+            disabled={loading || !username || !password}
+            className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg font-medium transition-colors"
+          >
+            {loading ? 'Signing in...' : 'Sign in'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function AppContent() {
-  const { isAuthenticated, loading, pair, logout } = useAuth();
+  const { isAuthenticated, loading, pair, pamLogin, pamEnabled, logout } = useAuth();
   const [locale, setLocaleState] = useState<Locale>('tr');
 
   const setAppLocale = (newLocale: Locale) => {
@@ -107,6 +168,9 @@ function AppContent() {
   }
 
   if (!isAuthenticated) {
+    if (pamEnabled) {
+      return <PamLoginDialog onLogin={pamLogin} />;
+    }
     return <PairingDialog onPair={pair} />;
   }
 

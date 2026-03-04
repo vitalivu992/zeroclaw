@@ -98,12 +98,46 @@ export async function pair(code: string): Promise<{ token: string }> {
 // Public health (no auth required)
 // ---------------------------------------------------------------------------
 
-export async function getPublicHealth(): Promise<{ require_pairing: boolean; paired: boolean }> {
+export async function getPublicHealth(): Promise<{
+  require_pairing: boolean;
+  paired: boolean;
+  pam_available: boolean;
+  pam_enabled: boolean;
+}> {
   const response = await fetch('/health');
   if (!response.ok) {
     throw new Error(`Health check failed (${response.status})`);
   }
-  return response.json() as Promise<{ require_pairing: boolean; paired: boolean }>;
+  return response.json() as Promise<{
+    require_pairing: boolean;
+    paired: boolean;
+    pam_available: boolean;
+    pam_enabled: boolean;
+  }>;
+}
+
+// ---------------------------------------------------------------------------
+// PAM login
+// ---------------------------------------------------------------------------
+
+export async function pamLogin(
+  username: string,
+  password: string,
+): Promise<{ token: string }> {
+  const response = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`Login failed (${response.status}): ${text || response.statusText}`);
+  }
+
+  const data = (await response.json()) as { token: string };
+  setToken(data.token);
+  return data;
 }
 
 // ---------------------------------------------------------------------------

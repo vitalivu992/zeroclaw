@@ -978,6 +978,10 @@ Environment overrides:
 | `port` | `42617` | gateway listen port |
 | `require_pairing` | `true` | require pairing before bearer auth |
 | `allow_public_bind` | `false` | block accidental public exposure |
+| `pam_auth` | `false` | enable Linux PAM authentication for the web portal |
+| `pam_service` | `"login"` | PAM service name (`/etc/pam.d/<name>`); requires `auth-pam` Cargo feature |
+
+> **PAM auth notes:** `pam_auth = true` requires compiling with `--features auth-pam` and `libpam-dev` installed on the host. When enabled, the web portal shows a username/password login form instead of the pairing-code form, and validates credentials against the host PAM stack. Webhooks and API endpoints keep their existing bearer-token auth.
 
 ## `[gateway.node_control]` (experimental)
 

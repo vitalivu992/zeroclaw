@@ -18,6 +18,7 @@ For current runtime behavior, start here:
 - Operations runbook: [../operations-runbook.md](../operations-runbook.md)
 - Troubleshooting: [../troubleshooting.md](../troubleshooting.md)
 - CI/Security audit event schema: [../audit-event-schema.md](../audit-event-schema.md)
+- PAM authentication for the gateway portal: [./pam-auth.md](./pam-auth.md)
 - Syscall anomaly detection: [./syscall-anomaly-detection.md](./syscall-anomaly-detection.md)
 - Perplexity suffix filter: [./perplexity-filter.md](./perplexity-filter.md)
 - Enject-inspired hardening notes: [./enject-inspired-hardening.md](./enject-inspired-hardening.md)
