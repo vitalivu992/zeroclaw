@@ -36,6 +36,7 @@ pub mod landlock;
 pub mod leak_detector;
 pub mod otp;
 pub mod pairing;
+pub mod pam;
 pub mod perplexity;
 pub mod policy;
 pub mod prompt_guard;

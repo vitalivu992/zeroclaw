@@ -321,6 +321,22 @@ impl PairingGuard {
         devices
     }
 
+    /// Insert a bearer token issued by an external auth mechanism (e.g. PAM) into
+    /// the paired-token set so that subsequent API requests are accepted.
+    ///
+    /// The plaintext `token` is hashed before storage — the caller must return
+    /// the plaintext to the client and must not log it.
+    pub fn add_session_token(&self, token: &str) {
+        let hashed = hash_token(token);
+        let mut tokens = self.paired_tokens.lock();
+        tokens.insert(hashed.clone());
+        drop(tokens);
+        let mut metadata = self.paired_device_meta.lock();
+        metadata
+            .entry(hashed)
+            .or_insert_with(|| PairedDeviceMeta::fresh(Some("pam".to_string())));
+    }
+
     /// Revoke a paired device by short ID (hash prefix) or full token hash.
     ///
     /// Returns true when a device token was removed.
