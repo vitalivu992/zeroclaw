@@ -22,7 +22,33 @@ the pairing flow. All subsequent dashboard requests use this bearer token.
 |---|---|
 | Linux host | PAM is a Linux subsystem |
 | `libpam-dev` installed | `sudo apt install libpam-dev` on Debian/Ubuntu |
-| `auth-pam` Cargo feature | `cargo build --features auth-pam` |
+| `auth-pam` Cargo feature | See build instructions below |
+
+## Build Instructions
+
+> **Important:** The `bootstrap.sh` script builds **without** PAM support by default.
+> You must rebuild with the `auth-pam` feature to enable PAM authentication.
+
+1. Install the PAM development library:
+
+```bash
+sudo apt install libpam-dev
+```
+
+2. Build with the `auth-pam` feature:
+
+```bash
+cargo build --release --locked --features auth-pam
+```
+
+3. Verify PAM is available after starting the gateway:
+
+```bash
+curl http://localhost:8080/health | jq '.pam_available'
+# Should output: true
+```
+
+If you ran `bootstrap.sh` first, simply rebuild with the feature flag — there's no need to re-run the full bootstrap.
 
 ## Configuration
 
